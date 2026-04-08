@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGPT Performance Optimizer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 380px;
+      background: #f4f6f8;
+      color: #1f2937;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      overflow-x: hidden;
+      overflow-y: auto;
+      max-height: 620px;
+      line-height: 1.35;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.35); border-radius: 4px; }
+
+    /* ═══ HEADER ═══ */
+    .header {
+      padding: 16px 16px 12px;
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      position: relative;
+    }
+    .header-row { display: flex; align-items: center; justify-content: flex-start; gap: 10px; }
+    .header-icon {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: #f8fafc;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid #e2e8f0;
+      flex-shrink: 0;
+    }
+    .header-icon svg { width: 17px; height: 17px; fill: #2563eb; }
+    .header-text h1 { font-size: 14px; font-weight: 700; color: #111827; letter-spacing: 0; text-align: left; }
+    .header-text p { font-size: 11px; color: #64748b; text-align: left; }
+    .kbd-hint {
+      position: absolute; top: 12px; right: 14px;
+      padding: 3px 8px; border-radius: 6px;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+      font-size: 10px; color: #475569; font-weight: 600; letter-spacing: 0.02em;
+    }
+
+    /* ═══ STATUS CARD ═══ */
+    .status-card {
+      margin: 12px 14px;
+      padding: 12px 13px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .status-card.active {
+      border-color: #bfdbfe;
+      background: #f8fbff;
+    }
+    .status-info { display: flex; align-items: center; gap: 10px; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #94a3b8; transition: background 0.2s ease; flex-shrink: 0;
+    }
+    .status-card.active .status-dot {
+      background: #2563eb;
+    }
+    .status-label { font-size: 12px; font-weight: 600; color: #0f172a; }
+    .status-sublabel { font-size: 10px; color: #64748b; margin-top: 1px; }
+
+    /* Toggle Switch */
+    .toggle-wrapper { position: relative; width: 42px; height: 22px; cursor: pointer; flex-shrink: 0; }
+    .toggle-wrapper input { opacity: 0; width: 0; height: 0; }
+    .toggle-track { position: absolute; inset: 0; border-radius: 11px; background: #cbd5e1; transition: all 0.2s ease; }
+    .toggle-wrapper input:checked + .toggle-track { background: #2563eb; }
+    .toggle-thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .toggle-wrapper input:checked ~ .toggle-thumb { left: 22px; }
+
+    /* ═══ SECTION ═══ */
+    .section { padding: 0 14px 10px; }
+    .section-title {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: #64748b; margin-bottom: 8px; padding: 0 2px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .section-title .tag {
+      padding: 1px 5px; border-radius: 4px;
+      background: #eff6ff; color: #2563eb;
+      font-size: 7px; font-weight: 800;
+    }
+
+    /* ═══ PRESET BUTTONS ═══ */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .preset-btn {
+      padding: 10px 8px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #0f172a;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      text-align: center;
+    }
+    .preset-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+    .preset-btn.active {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+    }
+    .preset-btn .preset-label { display: block; }
+    .preset-btn .preset-msgs { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .preset-btn.active .preset-msgs { color: #1d4ed8; }
+    .preset-state {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #64748b;
+      padding: 0 2px;
+    }
+
+    /* ═══ CUSTOM MESSAGE COUNT ═══ */
+    .msg-count-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .msg-count-row label { font-size: 10px; color: #475569; font-weight: 500; white-space: nowrap; }
+    .msg-count-row input[type="number"] {
+      width: 56px; padding: 5px 6px;
+      background: #ffffff;
+      border: 1px solid #d1d9e6;
+      border-radius: 6px;
+      color: #2563eb; font-family: inherit;
+      font-size: 13px; font-weight: 800;
+      text-align: center; outline: none;
+      -moz-appearance: textfield;
+    }
+    .msg-count-row input[type="number"]::-webkit-inner-spin-button,
+    .msg-count-row input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .msg-count-row input[type="number"]:focus {
+      border-color: #93c5fd;
+    }
+    .msg-count-slider {
+      flex: 1; height: 3px;
+      -webkit-appearance: none; appearance: none;
+      background: #dce4f0; border-radius: 2px; outline: none;
+    }
+    .msg-count-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #2563eb;
+      cursor: pointer;
+    }
+    .quick-btns { display: flex; gap: 3px; }
+    .quick-btn {
+      padding: 4px 7px; border-radius: 5px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #475569; font-family: inherit;
+      font-size: 9px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .quick-btn:hover { background: #f8fafc; color: #1e293b; border-color: #cbd5e1; }
+    .quick-btn.active { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
+
+    /* ═══ THRESHOLD ROW ═══ */
+    .threshold-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px; margin-bottom: 8px;
+    }
+    .threshold-row label { font-size: 10px; color: #475569; font-weight: 500; white-space: nowrap; }
+    .threshold-row .setting-value {
+      font-size: 12px; font-weight: 700; color: #1d4ed8;
+      min-width: 24px; text-align: center;
+    }
+
+    /* ═══ OPTIMIZATION TOGGLES ═══ */
+    .opt-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+    .opt-card {
+      padding: 8px 9px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+      display: flex; align-items: flex-start; gap: 7px;
+    }
+    .opt-card:hover { background: #f8fafc; border-color: #cbd5e1; }
+    .opt-card.enabled { border-color: #93c5fd; background: #f8fbff; }
+    .opt-card input[type="checkbox"] {
+      accent-color: #2563eb; width: 12px; height: 12px;
+      margin-top: 1px; flex-shrink: 0; cursor: pointer;
+    }
+    .opt-card-text { flex: 1; }
+    .opt-card-title { font-size: 10px; font-weight: 600; color: #1e293b; line-height: 1.2; }
+    .opt-card-hint { font-size: 8px; color: #64748b; margin-top: 1px; line-height: 1.2; }
+    .opt-card.enabled .opt-card-title { color: #1d4ed8; }
+
+    /* ═══ DOM REDUCTION BAR ═══ */
+    .reduction-bar {
+      margin: 0 14px 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+    }
+    .reduction-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 5px;
+    }
+    .reduction-header span:first-child { font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .reduction-pct { font-size: 16px; font-weight: 800; color: #2563eb; }
+    .reduction-track {
+      width: 100%; height: 5px;
+      border-radius: 3px; background: #dce4f0; overflow: hidden;
+    }
+    .reduction-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, #1d4ed8, #2563eb, #60a5fa);
+      transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+    }
+    .reduction-detail {
+      display: flex; justify-content: space-between;
+      margin-top: 4px; font-size: 8px; color: #64748b;
+    }
+
+    /* ═══ STATS GRID ═══ */
+    .stats-grid {
+      margin: 0 14px 8px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+    .stat-card {
+      padding: 8px 6px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    .stat-number { font-size: 16px; font-weight: 800; line-height: 1; color: #0f172a; }
+    .stat-number.green,
+    .stat-number.amber,
+    .stat-number.blue,
+    .stat-number.red,
+    .stat-number.purple,
+    .stat-number.cyan { color: #0f172a; }
+    .stat-desc {
+      font-size: 8px; color: #64748b; margin-top: 2px;
+      text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+    }
+
+    /* ═══ SHORTCUTS INFO ═══ */
+    .shortcuts-bar {
+      margin: 0 14px 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      display: flex; flex-wrap: wrap; gap: 8px;
+      align-items: center;
+    }
+    .shortcut-item { display: flex; align-items: center; gap: 4px; }
+    .shortcut-key {
+      padding: 2px 5px; border-radius: 4px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      font-size: 8px; font-weight: 700; color: #334155;
+      font-family: 'Menlo', monospace;
+    }
+    .shortcut-desc { font-size: 8px; color: #64748b; }
+
+    /* ═══ FOOTER ═══ */
+    .footer {
+      text-align: center;
+      padding: 6px 14px 12px;
+      font-size: 9px; color: #64748b;
+    }
+    .footer-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .footer-badge {
+      padding: 2px 6px; border-radius: 4px;
+      background: #eff6ff;
+      color: #1d4ed8; font-weight: 700; font-size: 8px;
+    }
+
+    /* ═══ UTILS ═══ */
+    .divider { height: 1px; background: #e2e8f0; margin: 4px 14px 8px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-row">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      </div>
+      <div class="header-text">
+        <h1>ChatGPT Performance Optimizer</h1>
+        <p>Professional controls for faster conversations</p>
+      </div>
+    </div>
+    <span class="kbd-hint">Ctrl+Shift+P</span>
+  </div>
+
+  <!-- Master Toggle -->
+  <div class="status-card" id="statusCard">
+    <div class="status-info">
+      <div class="status-dot"></div>
+      <div>
+        <div class="status-label" id="statusLabel">Disabled</div>
+        <div class="status-sublabel" id="statusSublabel">Toggle to optimize</div>
+      </div>
+    </div>
+    <label class="toggle-wrapper">
+      <input type="checkbox" id="mainToggle">
+      <div class="toggle-track"></div>
+      <div class="toggle-thumb"></div>
+    </label>
+  </div>
+
+  <!-- Performance Presets -->
+  <div class="section">
+    <div class="section-title">Performance Presets</div>
+    <div class="preset-grid" id="presetGrid">
+      <button class="preset-btn" data-preset="mild">
+        <span class="preset-label">Mild</span>
+        <span class="preset-msgs">25 messages</span>
+      </button>
+      <button class="preset-btn active" data-preset="balanced">
+        <span class="preset-label">Balanced</span>
+        <span class="preset-msgs">15 messages</span>
+      </button>
+      <button class="preset-btn" data-preset="aggressive">
+        <span class="preset-label">Aggressive</span>
+        <span class="preset-msgs">8 messages</span>
+      </button>
+      <button class="preset-btn" data-preset="extreme">
+        <span class="preset-label">Extreme</span>
+        <span class="preset-msgs">3 messages</span>
+      </button>
+    </div>
+    <div class="preset-state" id="presetState">Current preset: Balanced</div>
+  </div>
+
+  <!-- Custom Message Count -->
+  <div class="section">
+    <div class="section-title">Messages to Keep Visible</div>
+    <div class="msg-count-row">
+      <label>Keep</label>
+      <input type="number" id="visibleCount" min="1" max="100" value="15">
+      <input type="range" id="visibleSlider" class="msg-count-slider" min="1" max="100" value="15">
+      <label>messages</label>
+    </div>
+    <div class="msg-count-row" style="padding: 6px 10px;">
+      <label style="margin-right: auto;">Quick:</label>
+      <div class="quick-btns">
+        <button class="quick-btn" data-count="3">3</button>
+        <button class="quick-btn" data-count="5">5</button>
+        <button class="quick-btn" data-count="10">10</button>
+        <button class="quick-btn active" data-count="15">15</button>
+        <button class="quick-btn" data-count="20">20</button>
+        <button class="quick-btn" data-count="30">30</button>
+        <button class="quick-btn" data-count="50">50</button>
+      </div>
+    </div>
+
+    <div class="threshold-row">
+      <label>Auto-trigger at</label>
+      <input type="range" id="threshold" class="msg-count-slider" min="5" max="80" value="20" style="flex:1;">
+      <span class="setting-value" id="thresholdDisplay">20</span>
+      <label>messages</label>
+    </div>
+  </div>
+
+  <!-- Optimization Layers -->
+  <div class="section">
+    <div class="section-title">Optimization Layers <span class="tag">8 Layers</span></div>
+    <div class="opt-grid">
+      <div class="opt-card enabled" data-key="autoDetect">
+        <input type="checkbox" id="autoDetect" checked>
+        <div class="opt-card-text">
+          <div class="opt-card-title">Smart Detection</div>
+          <div class="opt-card-hint">Auto-enable on lag</div>
+        </div>
+      </div>
+      <div class="opt-card enabled" data-key="killAnimations">
+        <input type="checkbox" id="killAnimations" checked>
+        <div class="opt-card-text">
+          <div class="opt-card-title">Kill Animations</div>
+          <div class="opt-card-hint">Disable CSS anim</div>
+        </div>
+      </div>
+      <div class="opt-card enabled" data-key="cssContainment">
+        <input type="checkbox" id="cssContainment" checked>
+        <div class="opt-card-text">
+          <div class="opt-card-title">CSS Containment</div>
+          <div class="opt-card-hint">Isolate layout/paint</div>
+        </div>
+      </div>
+      <div class="opt-card enabled" data-key="optimizeCodeBlocks">
+        <input type="checkbox" id="optimizeCodeBlocks" checked>
+        <div class="opt-card-text">
+          <div class="opt-card-title">Code Optimizer</div>
+          <div class="opt-card-hint">Flatten highlights</div>
+        </div>
+      </div>
+      <div class="opt-card enabled" data-key="lazyImages">
+        <input type="checkbox" id="lazyImages" checked>
+        <div class="opt-card-text">
+          <div class="opt-card-title">Lazy Images</div>
+          <div class="opt-card-hint">Defer off-screen</div>
+        </div>
+      </div>
+      <div class="opt-card enabled" data-key="showFloatingBtn">
+        <input type="checkbox" id="showFloatingBtn" checked>
+        <div class="opt-card-text">
+          <div class="opt-card-title">Floating Button</div>
+          <div class="opt-card-hint">On-page toggle</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- DOM Reduction -->
+  <div class="reduction-bar" id="reductionBar">
+    <div class="reduction-header">
+      <span>DOM Reduction</span>
+      <span class="reduction-pct" id="reductionPct">0%</span>
+    </div>
+    <div class="reduction-track">
+      <div class="reduction-fill" id="reductionFill" style="width:0%"></div>
+    </div>
+    <div class="reduction-detail">
+      <span id="nodesBefore">Before: —</span>
+      <span id="nodesAfter">After: —</span>
+      <span id="nodesSaved">Saved: —</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number green" id="statHidden">0</div>
+      <div class="stat-desc">Hidden</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number amber" id="statVisible">0</div>
+      <div class="stat-desc">Visible</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number blue" id="statTotal">0</div>
+      <div class="stat-desc">Total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number red" id="statNodesRemoved">0</div>
+      <div class="stat-desc">Nodes Cut</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number purple" id="statCodeBlocks">0</div>
+      <div class="stat-desc">Code Opt</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number cyan" id="statImagesDeferred">0</div>
+      <div class="stat-desc">Imgs Lazy</div>
+    </div>
+  </div>
+
+  <!-- Shortcuts -->
+  <div class="shortcuts-bar">
+    <div class="shortcut-item">
+      <span class="shortcut-key">Ctrl+Shift+P</span>
+      <span class="shortcut-desc">Toggle</span>
+    </div>
+    <div class="shortcut-item">
+      <span class="shortcut-key">Ctrl+Shift+O</span>
+      <span class="shortcut-desc">Cycle preset</span>
+    </div>
+    <div class="shortcut-item">
+      <span class="shortcut-key">Right-click</span>
+      <span class="shortcut-desc">Context menu</span>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-row">
+      <span class="footer-badge">v2.2</span>
+      <span>ChatGPT Performance Optimizer — 8 Layer Engine</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

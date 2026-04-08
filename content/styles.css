@@ -1,0 +1,284 @@
+/* ============================================
+  ChatGPT Performance Optimizer v2.2 — Injected Styles
+   ============================================ */
+
+/* --- Floating Toggle Button --- */
+#cpo-toggle-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 99999;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#cpo-toggle-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+#cpo-toggle-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* ON State */
+#cpo-toggle-btn.cpo-active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+}
+
+#cpo-toggle-btn.cpo-active::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  background: #34d399;
+  border-radius: 50%;
+  border: 2px solid #1a1a2e;
+  animation: cpo-pulse 2s ease-in-out infinite;
+}
+
+/* OFF State */
+#cpo-toggle-btn.cpo-inactive {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  color: #9ca3af;
+}
+
+/* Tooltip */
+#cpo-toggle-btn .cpo-tooltip {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(17, 24, 39, 0.95);
+  color: #e5e7eb;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#cpo-toggle-btn:hover .cpo-tooltip {
+  opacity: 1;
+}
+
+/* --- Status Badge --- */
+#cpo-status-badge {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+#cpo-status-badge.cpo-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+#cpo-status-badge.cpo-badge-active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+}
+
+#cpo-status-badge.cpo-badge-inactive {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+#cpo-status-badge .cpo-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+#cpo-status-badge.cpo-badge-active .cpo-badge-dot {
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+}
+
+#cpo-status-badge.cpo-badge-inactive .cpo-badge-dot {
+  background: #6b7280;
+}
+
+/* --- "Show All" Expand Button --- */
+#cpo-expand-btn {
+  display: none;
+  width: 100%;
+  padding: 14px 0;
+  margin: 4px 0 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.04);
+  color: #9ca3af;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+#cpo-expand-btn:hover {
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+#cpo-expand-btn.cpo-show {
+  display: block;
+}
+
+/* --- Hidden message styling (fallback, L1 uses DOM detach) --- */
+[data-cpo-hidden="true"] {
+  display: none !important;
+}
+
+/* --- Code Block Expand Button (L4) --- */
+.cpo-code-expand {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-top: 4px;
+  border: 1px dashed rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.05);
+  color: #34d399;
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.cpo-code-expand:hover {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+/* --- Lazy image placeholder styling --- */
+img[data-cpo-lazy] {
+  min-height: 40px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+/* --- Animations --- */
+@keyframes cpo-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+@keyframes cpo-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Stats Panel (on hover of status badge) --- */
+#cpo-stats-panel {
+  position: fixed;
+  top: 48px;
+  right: 12px;
+  z-index: 99997;
+  background: rgba(17, 24, 39, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+  min-width: 250px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#cpo-stats-panel.cpo-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+#cpo-stats-panel h4 {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+}
+
+.cpo-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.cpo-stat-row:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.cpo-stat-label {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.cpo-stat-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.cpo-stat-value.cpo-highlight {
+  color: #34d399;
+}
+
+.cpo-stat-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 6px 0;
+}
