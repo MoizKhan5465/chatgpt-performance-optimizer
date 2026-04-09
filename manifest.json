@@ -23,6 +23,7 @@
     {
       "matches": [
         "https://chatgpt.com/*",
+        "https://www.chatgpt.com/*",
         "https://chat.openai.com/*"
       ],
       "js": ["content/content.js"],
@@ -49,6 +50,7 @@
   "permissions": ["storage", "contextMenus"],
   "host_permissions": [
     "https://chatgpt.com/*",
+    "https://www.chatgpt.com/*",
     "https://chat.openai.com/*"
   ]
 }

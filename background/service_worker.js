@@ -3,7 +3,7 @@
  * Handles keyboard shortcuts, context menus, and badge updates.
  */
 
-const CHATGPT_URL_PATTERNS = ['https://chatgpt.com/*', 'https://chat.openai.com/*'];
+const CHATGPT_URL_PATTERNS = ['https://chatgpt.com/*', 'https://www.chatgpt.com/*', 'https://chat.openai.com/*'];
 
 // ── Performance Presets ──────────────────────────────────────────
 const PRESETS = {

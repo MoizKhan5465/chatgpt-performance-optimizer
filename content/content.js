@@ -89,6 +89,7 @@
 
     // Stats
     totalMessages: 0,
+    sentMessages: 0,
     hiddenMessages: 0,
     domNodesRemoved: 0,
     codeBlocksOptimized: 0,
@@ -158,6 +159,64 @@
     return document.querySelector('main');
   }
 
+  function countSentMessages(messages) {
+    if (!messages || messages.length === 0) return 0;
+
+    let sent = 0;
+    messages.forEach((el) => {
+      try {
+        if (
+          el.matches?.('[data-message-author-role="user"]')
+          || el.getAttribute?.('data-message-author-role') === 'user'
+          || el.querySelector?.('[data-message-author-role="user"]')
+          || el.querySelector?.('[data-testid*="user-message"]')
+          || el.querySelector?.('[aria-label*="You"]')
+        ) {
+          sent++;
+          return;
+        }
+
+        const testId = el.getAttribute?.('data-testid') || '';
+        if (testId.includes('conversation-turn-') && testId.includes('user')) {
+          sent++;
+        }
+      } catch (e) {
+        // Ignore malformed element checks.
+      }
+    });
+
+    return sent;
+  }
+
+  function refreshMessageStats() {
+    const visibleMessages = getMessages();
+    const detachedMessageNodes = Array.from(detachedNodes.values()).map(item => item.node).filter(Boolean);
+    const allKnownMessages = visibleMessages.concat(detachedMessageNodes);
+
+    STATE.totalMessages = allKnownMessages.length;
+    STATE.hiddenMessages = detachedMessageNodes.length;
+    STATE.sentMessages = countSentMessages(allKnownMessages);
+    return visibleMessages;
+  }
+
+  function getEffectiveHiddenCount() {
+    return Math.max(0, STATE.hiddenMessages);
+  }
+
+  function getSafeDomCounts(currentNodes) {
+    const beforeRaw = STATE.domNodesBefore || 0;
+    const afterRaw = currentNodes || 0;
+    const before = Math.max(beforeRaw, afterRaw);
+    const after = beforeRaw > 0 ? afterRaw : before;
+    return { before, after };
+  }
+
+  function getSavedDomNodes() {
+    const currentNodes = countDOMNodes(true, true);
+    const { before, after } = getSafeDomCounts(currentNodes);
+    return Math.max(0, before - after);
+  }
+
   let cachedNodeCount = 0;
   let lastNodeCountAt = 0;
   let nodeCountDirty = true;
@@ -198,8 +257,7 @@
     if (observer) observer.disconnect();
 
     try {
-      const messages = getMessages();
-      STATE.totalMessages = messages.length;
+      const messages = refreshMessageStats();
 
       // Snapshot DOM count BEFORE our changes (exclude our UI)
       if (STATE.domNodesBefore === 0) {
@@ -590,11 +648,13 @@
 
     if (STATE.enabled) {
       badge.className = 'cpo-badge-active cpo-visible';
+      const liveSavedNodes = getSavedDomNodes();
 
       // Build accurate status parts
       const parts = [];
-      if (STATE.hiddenMessages > 0) parts.push(`${STATE.hiddenMessages} msgs hidden`);
-      if (STATE.domNodesRemoved > 0) parts.push(`${STATE.domNodesRemoved.toLocaleString()} nodes freed`);
+      const effectiveHidden = getEffectiveHiddenCount();
+      if (effectiveHidden > 0) parts.push(`${effectiveHidden} msgs hidden`);
+      if (liveSavedNodes > 0) parts.push(`${liveSavedNodes.toLocaleString()} nodes freed`);
       if (STATE.containmentApplied) parts.push('containment');
       if (STATE.animationsKilled) parts.push('anims killed');
       if (STATE.codeBlocksOptimized > 0) parts.push(`${STATE.codeBlocksOptimized} code opt`);
@@ -606,6 +666,9 @@
         text.textContent = `⚡ Active · ${STATE.totalMessages} msgs · ${layers > 0 ? layers + ' layers' : 'monitoring'}`;
       } else {
         text.textContent = `⚡ ${parts.join(' · ')}`;
+      }
+      if (STATE.sentMessages > 0) {
+        text.textContent += ` · You sent ${STATE.sentMessages}`;
       }
     } else {
       badge.className = 'cpo-badge-inactive cpo-visible';
@@ -629,6 +692,10 @@
       <div class="cpo-stat-row">
         <span class="cpo-stat-label">Total Messages</span>
         <span class="cpo-stat-value" id="cpo-sp-total">0</span>
+      </div>
+      <div class="cpo-stat-row">
+        <span class="cpo-stat-label">You Sent (this chat)</span>
+        <span class="cpo-stat-value" id="cpo-sp-sent">0</span>
       </div>
       <div class="cpo-stat-row">
         <span class="cpo-stat-label">Visible</span>
@@ -682,16 +749,20 @@
   }
 
   function updateStatsPanel() {
+    refreshMessageStats();
     const currentNodes = countDOMNodes(true, true);
-    const saved = Math.max(0, STATE.domNodesBefore - currentNodes);
+    const effectiveHidden = getEffectiveHiddenCount();
+    const { before, after } = getSafeDomCounts(currentNodes);
+    const saved = Math.max(0, before - after);
 
     const updates = {
       'cpo-sp-total': STATE.totalMessages,
-      'cpo-sp-visible': STATE.totalMessages - STATE.hiddenMessages,
-      'cpo-sp-hidden': STATE.hiddenMessages,
-      'cpo-sp-nodes-before': STATE.domNodesBefore > 0 ? STATE.domNodesBefore.toLocaleString() : currentNodes.toLocaleString(),
-      'cpo-sp-nodes-after': currentNodes.toLocaleString(),
-      'cpo-sp-removed': saved > 0 ? saved.toLocaleString() : STATE.domNodesRemoved.toLocaleString(),
+      'cpo-sp-sent': STATE.sentMessages,
+      'cpo-sp-visible': Math.max(0, STATE.totalMessages - effectiveHidden),
+      'cpo-sp-hidden': effectiveHidden,
+      'cpo-sp-nodes-before': before.toLocaleString(),
+      'cpo-sp-nodes-after': after.toLocaleString(),
+      'cpo-sp-removed': saved.toLocaleString(),
       'cpo-sp-containment': STATE.containmentApplied ? '✅ Active' : '⬜ Off',
       'cpo-sp-anims': STATE.animationsKilled ? '✅ Killed' : '⬜ Off',
       'cpo-sp-code': STATE.codeBlocksOptimized,
@@ -710,7 +781,10 @@
      ================================================================ */
   function applyAllOptimizations() {
     // Capture baseline DOM count BEFORE adding anything
-    STATE.domNodesBefore = countDOMNodes(true, true);
+    const liveNodeCount = countDOMNodes(true, true);
+    STATE.domNodesBefore = STATE.domNodesBefore > 0
+      ? Math.max(STATE.domNodesBefore, liveNodeCount)
+      : liveNodeCount;
     STATE.domNodesRemoved = 0;
 
     document.body.classList.add('cpo-perf-mode');
@@ -774,7 +848,7 @@
   function smartDetect() {
     if (!STATE.autoDetect || STATE.enabled || isOptimizing) return;
 
-    const messages = getMessages();
+    const messages = refreshMessageStats();
     if (messages.length >= STATE.threshold) {
       log('Auto-activating — messages:', messages.length, '≥ threshold:', STATE.threshold);
       togglePerformanceMode(true);
@@ -906,18 +980,22 @@
      BROADCAST STATS TO POPUP
      ================================================================ */
   function broadcastStats() {
+    refreshMessageStats();
     const currentNodes = countDOMNodes(true, true);
-    const saved = STATE.domNodesBefore > 0 ? Math.max(0, STATE.domNodesBefore - currentNodes) : STATE.domNodesRemoved;
+    const effectiveHidden = getEffectiveHiddenCount();
+    const { before, after } = getSafeDomCounts(currentNodes);
+    const saved = Math.max(0, before - after);
 
     safeChromeCall(() => {
       chrome.storage.local.set({
         cpo_stats: {
           total: STATE.totalMessages,
-          hidden: STATE.hiddenMessages,
-          visible: STATE.totalMessages - STATE.hiddenMessages,
-          domNodesBefore: STATE.domNodesBefore,
-          domNodesAfter: currentNodes,
-          domNodesRemoved: saved > 0 ? saved : STATE.domNodesRemoved,
+          sent: STATE.sentMessages,
+          hidden: effectiveHidden,
+          visible: Math.max(0, STATE.totalMessages - effectiveHidden),
+          domNodesBefore: before,
+          domNodesAfter: after,
+          domNodesRemoved: saved,
           codeBlocksOptimized: STATE.codeBlocksOptimized,
           imagesDeferred: STATE.imagesDeferred,
           containmentActive: STATE.containmentApplied,
@@ -1018,6 +1096,9 @@
      INIT
      ================================================================ */
   async function init() {
+    const chatHostnames = new Set(['chatgpt.com', 'www.chatgpt.com', 'chat.openai.com']);
+    if (!chatHostnames.has(window.location.hostname)) return;
+
     log(
       '%c⚡ ChatGPT Performance Optimizer v2.2 loaded',
       'color: #10b981; font-weight: bold; font-size: 14px; background: #0a0b10; padding: 4px 8px; border-radius: 4px;'

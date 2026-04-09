@@ -42,6 +42,7 @@
   const statHidden         = document.getElementById('statHidden');
   const statVisible        = document.getElementById('statVisible');
   const statTotal          = document.getElementById('statTotal');
+  const statSent           = document.getElementById('statSent');
   const statNodesRemoved   = document.getElementById('statNodesRemoved');
   const statCodeBlocks     = document.getElementById('statCodeBlocks');
   const statImagesDeferred = document.getElementById('statImagesDeferred');
@@ -118,6 +119,7 @@
     statHidden.textContent         = stats.hidden || 0;
     statVisible.textContent        = stats.visible || 0;
     statTotal.textContent          = stats.total || 0;
+    statSent.textContent           = stats.sent || 0;
     statNodesRemoved.textContent   = stats.domNodesRemoved || 0;
     statCodeBlocks.textContent     = stats.codeBlocksOptimized || 0;
     statImagesDeferred.textContent = stats.imagesDeferred || 0;
