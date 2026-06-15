@@ -1,533 +1,244 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ChatGPT Performance Optimizer</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      width: 380px;
-      background: #f4f6f8;
-      color: #1f2937;
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-      overflow-x: hidden;
-      overflow-y: auto;
-      max-height: 620px;
-      line-height: 1.35;
-    }
-
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.35); border-radius: 4px; }
-
-    /* ═══ HEADER ═══ */
-    .header {
-      padding: 16px 16px 12px;
-      background: #ffffff;
-      border-bottom: 1px solid #e2e8f0;
-      position: relative;
-    }
-    .header-row { display: flex; align-items: center; justify-content: flex-start; gap: 10px; }
-    .header-icon {
-      width: 34px; height: 34px; border-radius: 8px;
-      background: #f8fafc;
-      display: flex; align-items: center; justify-content: center;
-      border: 1px solid #e2e8f0;
-      flex-shrink: 0;
-    }
-    .header-icon svg { width: 17px; height: 17px; fill: #2563eb; }
-    .header-text h1 { font-size: 14px; font-weight: 700; color: #111827; letter-spacing: 0; text-align: left; }
-    .header-text p { font-size: 11px; color: #64748b; text-align: left; }
-    .kbd-hint {
-      position: absolute; top: 12px; right: 14px;
-      padding: 3px 8px; border-radius: 6px;
-      background: #f8fafc; border: 1px solid #e2e8f0;
-      font-size: 10px; color: #475569; font-weight: 600; letter-spacing: 0.02em;
-    }
-
-    /* ═══ STATUS CARD ═══ */
-    .status-card {
-      margin: 12px 14px;
-      padding: 12px 13px;
-      border-radius: 10px;
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      display: flex; align-items: center; justify-content: space-between;
-      transition: border-color 0.2s ease, background 0.2s ease;
-    }
-    .status-card.active {
-      border-color: #bfdbfe;
-      background: #f8fbff;
-    }
-    .status-info { display: flex; align-items: center; gap: 10px; }
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: #94a3b8; transition: background 0.2s ease; flex-shrink: 0;
-    }
-    .status-card.active .status-dot {
-      background: #2563eb;
-    }
-    .status-label { font-size: 12px; font-weight: 600; color: #0f172a; }
-    .status-sublabel { font-size: 10px; color: #64748b; margin-top: 1px; }
-
-    /* Toggle Switch */
-    .toggle-wrapper { position: relative; width: 42px; height: 22px; cursor: pointer; flex-shrink: 0; }
-    .toggle-wrapper input { opacity: 0; width: 0; height: 0; }
-    .toggle-track { position: absolute; inset: 0; border-radius: 11px; background: #cbd5e1; transition: all 0.2s ease; }
-    .toggle-wrapper input:checked + .toggle-track { background: #2563eb; }
-    .toggle-thumb {
-      position: absolute; top: 2px; left: 2px;
-      width: 18px; height: 18px; border-radius: 50%; background: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
-    }
-    .toggle-wrapper input:checked ~ .toggle-thumb { left: 22px; }
-
-    /* ═══ SECTION ═══ */
-    .section { padding: 0 14px 10px; }
-    .section-title {
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.06em;
-      color: #64748b; margin-bottom: 8px; padding: 0 2px;
-      display: flex; align-items: center; gap: 5px;
-    }
-    .section-title .tag {
-      padding: 1px 5px; border-radius: 4px;
-      background: #eff6ff; color: #2563eb;
-      font-size: 7px; font-weight: 800;
-    }
-
-    /* ═══ PRESET BUTTONS ═══ */
-    .preset-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .preset-btn {
-      padding: 10px 8px;
-      border-radius: 10px;
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      color: #0f172a;
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-      text-align: center;
-    }
-    .preset-btn:hover {
-      background: #f8fafc;
-      border-color: #cbd5e1;
-      color: #0f172a;
-    }
-    .preset-btn.active {
-      background: #eff6ff;
-      border-color: #93c5fd;
-      color: #1d4ed8;
-    }
-    .preset-btn .preset-label { display: block; }
-    .preset-btn .preset-msgs { font-size: 11px; color: #64748b; margin-top: 2px; }
-    .preset-btn.active .preset-msgs { color: #1d4ed8; }
-    .preset-state {
-      margin-top: 4px;
-      font-size: 10px;
-      color: #64748b;
-      padding: 0 2px;
-    }
-
-    /* ═══ CUSTOM MESSAGE COUNT ═══ */
-    .msg-count-row {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 10px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      margin-bottom: 8px;
-    }
-    .msg-count-row label { font-size: 10px; color: #475569; font-weight: 500; white-space: nowrap; }
-    .msg-count-row input[type="number"] {
-      width: 56px; padding: 5px 6px;
-      background: #ffffff;
-      border: 1px solid #d1d9e6;
-      border-radius: 6px;
-      color: #2563eb; font-family: inherit;
-      font-size: 13px; font-weight: 800;
-      text-align: center; outline: none;
-      -moz-appearance: textfield;
-    }
-    .msg-count-row input[type="number"]::-webkit-inner-spin-button,
-    .msg-count-row input[type="number"]::-webkit-outer-spin-button {
-      -webkit-appearance: none; margin: 0;
-    }
-    .msg-count-row input[type="number"]:focus {
-      border-color: #93c5fd;
-    }
-    .msg-count-slider {
-      flex: 1; height: 3px;
-      -webkit-appearance: none; appearance: none;
-      background: #dce4f0; border-radius: 2px; outline: none;
-    }
-    .msg-count-slider::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none;
-      width: 12px; height: 12px; border-radius: 50%;
-      background: #2563eb;
-      cursor: pointer;
-    }
-    .quick-btns { display: flex; gap: 3px; }
-    .quick-btn {
-      padding: 4px 7px; border-radius: 5px;
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      color: #475569; font-family: inherit;
-      font-size: 9px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s ease;
-    }
-    .quick-btn:hover { background: #f8fafc; color: #1e293b; border-color: #cbd5e1; }
-    .quick-btn.active { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
-
-    /* ═══ THRESHOLD ROW ═══ */
-    .threshold-row {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 10px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px; margin-bottom: 8px;
-    }
-    .threshold-row label { font-size: 10px; color: #475569; font-weight: 500; white-space: nowrap; }
-    .threshold-row .setting-value {
-      font-size: 12px; font-weight: 700; color: #1d4ed8;
-      min-width: 24px; text-align: center;
-    }
-
-    /* ═══ OPTIMIZATION TOGGLES ═══ */
-    .opt-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5px;
-    }
-    .opt-card {
-      padding: 8px 9px;
-      border-radius: 8px;
-      border: 1px solid #e2e8f0;
-      background: #ffffff;
-      cursor: pointer;
-      transition: border-color 0.2s ease, background 0.2s ease;
-      display: flex; align-items: flex-start; gap: 7px;
-    }
-    .opt-card:hover { background: #f8fafc; border-color: #cbd5e1; }
-    .opt-card.enabled { border-color: #93c5fd; background: #f8fbff; }
-    .opt-card input[type="checkbox"] {
-      accent-color: #2563eb; width: 12px; height: 12px;
-      margin-top: 1px; flex-shrink: 0; cursor: pointer;
-    }
-    .opt-card-text { flex: 1; }
-    .opt-card-title { font-size: 10px; font-weight: 600; color: #1e293b; line-height: 1.2; }
-    .opt-card-hint { font-size: 8px; color: #64748b; margin-top: 1px; line-height: 1.2; }
-    .opt-card.enabled .opt-card-title { color: #1d4ed8; }
-
-    /* ═══ DOM REDUCTION BAR ═══ */
-    .reduction-bar {
-      margin: 0 14px 8px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-    }
-    .reduction-header {
-      display: flex; justify-content: space-between;
-      align-items: center; margin-bottom: 5px;
-    }
-    .reduction-header span:first-child { font-size: 9px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-    .reduction-pct { font-size: 16px; font-weight: 800; color: #2563eb; }
-    .reduction-track {
-      width: 100%; height: 5px;
-      border-radius: 3px; background: #dce4f0; overflow: hidden;
-    }
-    .reduction-fill {
-      height: 100%; border-radius: 3px;
-      background: linear-gradient(90deg, #1d4ed8, #2563eb, #60a5fa);
-      transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
-    }
-    .reduction-detail {
-      display: flex; justify-content: space-between;
-      margin-top: 4px; font-size: 8px; color: #64748b;
-    }
-
-    /* ═══ STATS GRID ═══ */
-    .stats-grid {
-      margin: 0 14px 8px;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 4px;
-    }
-    .stat-card {
-      padding: 8px 6px;
-      border-radius: 8px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      text-align: center;
-    }
-    .stat-number { font-size: 16px; font-weight: 800; line-height: 1; color: #0f172a; }
-    .stat-number.green,
-    .stat-number.amber,
-    .stat-number.blue,
-    .stat-number.red,
-    .stat-number.purple,
-    .stat-number.cyan { color: #0f172a; }
-    .stat-desc {
-      font-size: 8px; color: #64748b; margin-top: 2px;
-      text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
-    }
-
-    /* ═══ SHORTCUTS INFO ═══ */
-    .shortcuts-bar {
-      margin: 0 14px 8px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      display: flex; flex-wrap: wrap; gap: 8px;
-      align-items: center;
-    }
-    .shortcut-item { display: flex; align-items: center; gap: 4px; }
-    .shortcut-key {
-      padding: 2px 5px; border-radius: 4px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      font-size: 8px; font-weight: 700; color: #334155;
-      font-family: 'Menlo', monospace;
-    }
-    .shortcut-desc { font-size: 8px; color: #64748b; }
-
-    /* ═══ FOOTER ═══ */
-    .footer {
-      text-align: center;
-      padding: 6px 14px 12px;
-      font-size: 9px; color: #64748b;
-    }
-    .footer-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
-    .footer-badge {
-      padding: 2px 6px; border-radius: 4px;
-      background: #eff6ff;
-      color: #1d4ed8; font-weight: 700; font-size: 8px;
-    }
-
-    /* ═══ UTILS ═══ */
-    .divider { height: 1px; background: #e2e8f0; margin: 4px 14px 8px; }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="header-row">
-      <div class="header-icon">
-        <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
       </div>
-      <div class="header-text">
-        <h1>ChatGPT Performance Optimizer</h1>
-        <p>Professional controls for faster conversations</p>
-      </div>
+      <span class="brand-name">CPO</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-sub">ChatGPT</span>
     </div>
-    <span class="kbd-hint">Ctrl+Shift+P</span>
-  </div>
-
-  <!-- Master Toggle -->
-  <div class="status-card" id="statusCard">
-    <div class="status-info">
-      <div class="status-dot"></div>
-      <div>
-        <div class="status-label" id="statusLabel">Disabled</div>
-        <div class="status-sublabel" id="statusSublabel">Toggle to optimize</div>
-      </div>
-    </div>
-    <label class="toggle-wrapper">
-      <input type="checkbox" id="mainToggle">
-      <div class="toggle-track"></div>
-      <div class="toggle-thumb"></div>
-    </label>
-  </div>
-
-  <!-- Performance Presets -->
-  <div class="section">
-    <div class="section-title">Performance Presets</div>
-    <div class="preset-grid" id="presetGrid">
-      <button class="preset-btn" data-preset="mild">
-        <span class="preset-label">Mild</span>
-        <span class="preset-msgs">25 messages</span>
+    <div class="header-controls">
+      <button class="icon-btn" id="themeToggle" title="Toggle theme">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
       </button>
-      <button class="preset-btn active" data-preset="balanced">
-        <span class="preset-label">Balanced</span>
-        <span class="preset-msgs">15 messages</span>
-      </button>
-      <button class="preset-btn" data-preset="aggressive">
-        <span class="preset-label">Aggressive</span>
-        <span class="preset-msgs">8 messages</span>
-      </button>
-      <button class="preset-btn" data-preset="extreme">
-        <span class="preset-label">Extreme</span>
-        <span class="preset-msgs">3 messages</span>
-      </button>
+      <label class="toggle-pill" title="Enable performance mode">
+        <input type="checkbox" id="mainToggle">
+        <span class="pill-track">
+          <span class="pill-thumb"></span>
+        </span>
+      </label>
     </div>
-    <div class="preset-state" id="presetState">Current preset: Balanced</div>
+  </header>
+
+  <!-- STATUS ROW -->
+  <div class="status-row">
+    <div class="status-left">
+      <span class="status-pip" id="statusPip"></span>
+      <span class="status-text" id="statusText">Inactive</span>
+    </div>
+    <span class="status-version">v3.0</span>
   </div>
 
-  <!-- Custom Message Count -->
-  <div class="section">
-    <div class="section-title">Messages to Keep Visible</div>
-    <div class="msg-count-row">
-      <label>Keep</label>
-      <input type="number" id="visibleCount" min="1" max="100" value="15">
-      <input type="range" id="visibleSlider" class="msg-count-slider" min="1" max="100" value="15">
-      <label>messages</label>
-    </div>
-    <div class="msg-count-row" style="padding: 6px 10px;">
-      <label style="margin-right: auto;">Quick:</label>
-      <div class="quick-btns">
-        <button class="quick-btn" data-count="3">3</button>
-        <button class="quick-btn" data-count="5">5</button>
-        <button class="quick-btn" data-count="10">10</button>
-        <button class="quick-btn active" data-count="15">15</button>
-        <button class="quick-btn" data-count="20">20</button>
-        <button class="quick-btn" data-count="30">30</button>
-        <button class="quick-btn" data-count="50">50</button>
-      </div>
-    </div>
-
-    <div class="threshold-row">
-      <label>Auto-trigger at</label>
-      <input type="range" id="threshold" class="msg-count-slider" min="5" max="80" value="20" style="flex:1;">
-      <span class="setting-value" id="thresholdDisplay">20</span>
-      <label>messages</label>
-    </div>
-  </div>
-
-  <!-- Optimization Layers -->
-  <div class="section">
-    <div class="section-title">Optimization Layers <span class="tag">8 Layers</span></div>
-    <div class="opt-grid">
-      <div class="opt-card enabled" data-key="autoDetect">
-        <input type="checkbox" id="autoDetect" checked>
-        <div class="opt-card-text">
-          <div class="opt-card-title">Smart Detection</div>
-          <div class="opt-card-hint">Auto-enable on lag</div>
-        </div>
-      </div>
-      <div class="opt-card enabled" data-key="killAnimations">
-        <input type="checkbox" id="killAnimations" checked>
-        <div class="opt-card-text">
-          <div class="opt-card-title">Kill Animations</div>
-          <div class="opt-card-hint">Disable CSS anim</div>
-        </div>
-      </div>
-      <div class="opt-card enabled" data-key="cssContainment">
-        <input type="checkbox" id="cssContainment" checked>
-        <div class="opt-card-text">
-          <div class="opt-card-title">CSS Containment</div>
-          <div class="opt-card-hint">Isolate layout/paint</div>
-        </div>
-      </div>
-      <div class="opt-card enabled" data-key="optimizeCodeBlocks">
-        <input type="checkbox" id="optimizeCodeBlocks" checked>
-        <div class="opt-card-text">
-          <div class="opt-card-title">Code Optimizer</div>
-          <div class="opt-card-hint">Flatten highlights</div>
-        </div>
-      </div>
-      <div class="opt-card enabled" data-key="lazyImages">
-        <input type="checkbox" id="lazyImages" checked>
-        <div class="opt-card-text">
-          <div class="opt-card-title">Lazy Images</div>
-          <div class="opt-card-hint">Defer off-screen</div>
-        </div>
-      </div>
-      <div class="opt-card enabled" data-key="showFloatingBtn">
-        <input type="checkbox" id="showFloatingBtn" checked>
-        <div class="opt-card-text">
-          <div class="opt-card-title">Floating Button</div>
-          <div class="opt-card-hint">On-page toggle</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <!-- DOM Reduction -->
-  <div class="reduction-bar" id="reductionBar">
-    <div class="reduction-header">
-      <span>DOM Reduction</span>
-      <span class="reduction-pct" id="reductionPct">0%</span>
-    </div>
-    <div class="reduction-track">
-      <div class="reduction-fill" id="reductionFill" style="width:0%"></div>
-    </div>
-    <div class="reduction-detail">
-      <span id="nodesBefore">Before: —</span>
-      <span id="nodesAfter">After: —</span>
-      <span id="nodesSaved">Saved: —</span>
-    </div>
-  </div>
-
-  <!-- Stats -->
+  <!-- STATS GRID -->
   <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-number green" id="statHidden">0</div>
-      <div class="stat-desc">Hidden</div>
+    <div class="stat-block">
+      <span class="stat-num" id="ringValue">0</span>
+      <span class="stat-desc">Messages</span>
     </div>
-    <div class="stat-card">
-      <div class="stat-number amber" id="statVisible">0</div>
-      <div class="stat-desc">Visible</div>
+    <div class="stat-block stat-block--accent">
+      <span class="stat-num" id="hiddenCount">0</span>
+      <span class="stat-desc">Hidden</span>
     </div>
-    <div class="stat-card">
-      <div class="stat-number blue" id="statTotal">0</div>
-      <div class="stat-desc">Total</div>
+    <div class="stat-block">
+      <span class="stat-num" id="visibleCount">0</span>
+      <span class="stat-desc">Rendering</span>
     </div>
-    <div class="stat-card">
-      <div class="stat-number blue" id="statSent">0</div>
-      <div class="stat-desc">You Sent</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-number red" id="statNodesRemoved">0</div>
-      <div class="stat-desc">Nodes Cut</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-number purple" id="statCodeBlocks">0</div>
-      <div class="stat-desc">Code Opt</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-number cyan" id="statImagesDeferred">0</div>
-      <div class="stat-desc">Imgs Lazy</div>
+    <div class="stat-block">
+      <span class="stat-num" id="savingPct">—</span>
+      <span class="stat-desc">Load saved</span>
     </div>
   </div>
 
-  <!-- Shortcuts -->
-  <div class="shortcuts-bar">
-    <div class="shortcut-item">
-      <span class="shortcut-key">Ctrl+Shift+P</span>
-      <span class="shortcut-desc">Toggle</span>
+  <!-- LOAD BAR -->
+  <div class="load-bar-section">
+    <div class="load-bar-header">
+      <span class="load-bar-label" id="progressInfo">0 messages in chat</span>
+      <span class="load-bar-threshold" id="thresholdLabel">trigger at 20</span>
     </div>
-    <div class="shortcut-item">
-      <span class="shortcut-key">Ctrl+Shift+O</span>
-      <span class="shortcut-desc">Cycle preset</span>
-    </div>
-    <div class="shortcut-item">
-      <span class="shortcut-key">Right-click</span>
-      <span class="shortcut-desc">Context menu</span>
+    <div class="load-bar-outer">
+      <div class="load-track">
+        <div class="load-fill" id="progressFill"></div>
+      </div>
+      <div class="load-marker" id="progressThreshold"></div>
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    <div class="footer-row">
-      <span class="footer-badge">v2.2</span>
-      <span>ChatGPT Performance Optimizer — 8 Layer Engine</span>
-    </div>
+  <!-- DIVIDER -->
+  <div class="section-divider">
+    <span>Layers</span>
   </div>
+
+  <!-- LAYERS — flat list rows, not cards -->
+  <div class="layer-list">
+
+    <div class="layer-row" id="lc-messageCollapsing">
+      <div class="layer-row-left">
+        <div class="layer-dot" id="dot-messageCollapsing"></div>
+        <div class="layer-text">
+          <span class="layer-row-name">Message Hiding</span>
+          <span class="layer-row-desc">Hides old messages off-screen</span>
+        </div>
+      </div>
+      <div class="layer-row-right">
+        <span class="layer-count" id="badge-messageCollapsing"></span>
+        <label class="toggle-pill sm">
+          <input type="checkbox" id="layer-messageCollapsing">
+          <span class="pill-track"><span class="pill-thumb"></span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="layer-row" id="lc-cssContainment">
+      <div class="layer-row-left">
+        <div class="layer-dot" id="dot-cssContainment"></div>
+        <div class="layer-text">
+          <span class="layer-row-name">CSS Containment</span>
+          <span class="layer-row-desc">Isolates layout & paint per message</span>
+        </div>
+      </div>
+      <div class="layer-row-right">
+        <label class="toggle-pill sm">
+          <input type="checkbox" id="layer-cssContainment">
+          <span class="pill-track"><span class="pill-thumb"></span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="layer-row" id="lc-killAnimations">
+      <div class="layer-row-left">
+        <div class="layer-dot" id="dot-killAnimations"></div>
+        <div class="layer-text">
+          <span class="layer-row-name">Kill Animations</span>
+          <span class="layer-row-desc">Stops CSS transitions & keyframes</span>
+        </div>
+      </div>
+      <div class="layer-row-right">
+        <label class="toggle-pill sm">
+          <input type="checkbox" id="layer-killAnimations">
+          <span class="pill-track"><span class="pill-thumb"></span></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="layer-row" id="lc-autoDetect">
+      <div class="layer-row-left">
+        <div class="layer-dot" id="dot-autoDetect"></div>
+        <div class="layer-text">
+          <span class="layer-row-name">Auto-Trigger</span>
+          <span class="layer-row-desc">Activates at message threshold</span>
+        </div>
+      </div>
+      <div class="layer-row-right">
+        <label class="toggle-pill sm">
+          <input type="checkbox" id="layer-autoDetect">
+          <span class="pill-track"><span class="pill-thumb"></span></span>
+        </label>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DIVIDER -->
+  <div class="section-divider">
+    <span>Settings</span>
+  </div>
+
+  <!-- SETTINGS — clean rows -->
+  <div class="settings-list">
+
+    <div class="setting-row">
+      <div class="setting-text">
+        <span class="setting-name">Keep visible</span>
+        <span class="setting-desc">Messages kept in view</span>
+      </div>
+      <div class="setting-control">
+        <span class="setting-val" id="visibleCountDisplay">15</span>
+        <input type="range" id="visibleCountSlider" class="range-input" min="1" max="30" value="15">
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-text">
+        <span class="setting-name">Auto-trigger at</span>
+        <span class="setting-desc">Message count threshold</span>
+      </div>
+      <div class="setting-control">
+        <span class="setting-val" id="thresholdDisplay">20</span>
+        <input type="range" id="thresholdSlider" class="range-input" min="3" max="50" value="20">
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-text">
+        <span class="setting-name">Floating button</span>
+        <span class="setting-desc">Show on-page toggle button</span>
+      </div>
+      <div class="setting-control">
+        <label class="toggle-pill sm">
+          <input type="checkbox" id="toggleFloatingBtn">
+          <span class="pill-track"><span class="pill-thumb"></span></span>
+        </label>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions-row">
+    <button class="action-btn action-btn--primary" id="runNowBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Run Now
+    </button>
+    <button class="action-btn action-btn--ghost" id="resetAllBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+      </svg>
+      Reset
+    </button>
+  </div>
+
+  <!-- Hidden compat spans -->
+  <span id="statHidden" style="display:none">0</span>
+  <span id="statFreed" style="display:none">0</span>
+  <span id="statCode" style="display:none">0</span>
+  <span id="statLazy" style="display:none">0</span>
+  <span id="statTotal" style="display:none">0</span>
+  <span id="statPageNodes" style="display:none">0</span>
+  <canvas id="sparkline" style="display:none" width="180" height="48"></canvas>
+  <span id="timelineNodes" style="display:none">0</span>
+  <span id="scoreValue" style="display:none">0%</span>
+  <circle id="scoreCircle" style="display:none"/>
+  <span id="scoreSubtitle" style="display:none"></span>
+  <!-- Banner compat -->
+  <span id="liveDot" style="display:none"></span>
+  <span id="liveLabel" style="display:none"></span>
+  <span id="liveStatus" style="display:none"></span>
+  <span id="streamStatus" style="display:none"></span>
+  <span id="streamBadge" style="display:none"></span>
+  <span id="metricHidden" style="display:none">0</span>
+  <span id="metricLayers" style="display:none">0/4</span>
+  <span id="layerBarFill" style="display:none"></span>
+  <span id="progressMax" style="display:none">50</span>
+  <span id="ringSub" style="display:none"></span>
+  <span id="statusDot" style="display:none"></span>
 
   <script src="popup.js"></script>
 </body>

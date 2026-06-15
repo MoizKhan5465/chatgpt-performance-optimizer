@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Performance Optimizer",
-  "version": "2.2.0",
-  "description": "Advanced performance optimizer for ChatGPT — DOM virtualization, FPS monitoring, animation killing, code block optimization, and smart auto-detection with customizable presets.",
+  "version": "3.0.0",
+  "description": "Lag-free performance optimizer for ChatGPT — React-safe message hiding, CSS containment, animation killer, and smart auto-detection.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -38,6 +38,13 @@
         "mac": "Command+Shift+P"
       },
       "description": "Toggle Performance Mode"
+    },
+    "toggle-floating-button": {
+      "suggested_key": {
+        "default": "Alt+Shift+P",
+        "mac": "Alt+Shift+P"
+      },
+      "description": "Toggle Floating Button Visibility"
     },
     "cycle-preset": {
       "suggested_key": {

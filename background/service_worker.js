@@ -1,11 +1,18 @@
 /**
- * ChatGPT Performance Optimizer v2.2 — Background Service Worker
- * Handles keyboard shortcuts, context menus, and badge updates.
+ * ChatGPT Performance Optimizer v2.3 — Background Service Worker
+ * Manages keyboard commands, context menus, and sync configurations.
  */
 
-const CHATGPT_URL_PATTERNS = ['https://chatgpt.com/*', 'https://www.chatgpt.com/*', 'https://chat.openai.com/*'];
+// Target domains for injecting performance overlays and enabling menu actions
+const URL_PATTERNS = [
+  'https://chatgpt.com/*',
+  'https://www.chatgpt.com/*',
+  'https://chat.openai.com/*',
+  'https://claude.ai/*',
+  'https://gemini.google.com/*'
+];
 
-// ── Performance Presets ──────────────────────────────────────────
+// --- Preset Rules (aligned with L1-L8 engine config) ---
 const PRESETS = {
   mild: {
     label: 'Mild',
@@ -51,45 +58,49 @@ const PRESETS = {
 
 const PRESET_ORDER = ['mild', 'balanced', 'aggressive', 'extreme'];
 
-// ── Context Menu Setup ───────────────────────────────────────────
+// --- Setup Context Menus ---
 chrome.runtime.onInstalled.addListener(() => {
+  // Main Toggle Option
   chrome.contextMenus.create({
     id: 'cpo-toggle',
     title: '⚡ Toggle Performance Mode',
     contexts: ['page'],
-    documentUrlPatterns: CHATGPT_URL_PATTERNS,
+    documentUrlPatterns: URL_PATTERNS,
   });
 
+  // Separator
   chrome.contextMenus.create({
     id: 'cpo-separator-1',
     type: 'separator',
     contexts: ['page'],
-    documentUrlPatterns: CHATGPT_URL_PATTERNS,
+    documentUrlPatterns: URL_PATTERNS,
   });
 
+  // Preset Selections
   PRESET_ORDER.forEach(key => {
     chrome.contextMenus.create({
       id: `cpo-preset-${key}`,
       title: `Preset: ${PRESETS[key].label}`,
       contexts: ['page'],
-      documentUrlPatterns: CHATGPT_URL_PATTERNS,
+      documentUrlPatterns: URL_PATTERNS,
     });
   });
 
-  // Set default preset
-  chrome.storage.local.get('cpo_preset', (data) => {
+  // Default preset setup
+  chrome.storage.sync.get('cpo_preset', (data) => {
     if (!data.cpo_preset) {
-      chrome.storage.local.set({ cpo_preset: 'balanced' });
+      chrome.storage.sync.set({ cpo_preset: 'balanced' });
     }
   });
 });
 
-// ── Context Menu Click Handler ───────────────────────────────────
+// --- Context Menu Actions ---
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'cpo-toggle') {
-    chrome.storage.local.get('cpo_enabled', (data) => {
-      chrome.storage.local.set({ cpo_enabled: !data.cpo_enabled });
-      updateBadge(!data.cpo_enabled);
+    chrome.storage.sync.get('cpo_enabled', (data) => {
+      const newState = !data.cpo_enabled;
+      chrome.storage.sync.set({ cpo_enabled: newState });
+      updateBadge(newState);
     });
   }
 
@@ -99,18 +110,22 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// ── Keyboard Shortcut Handler ────────────────────────────────────
+// --- Keyboard Shortcuts Listener ---
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'toggle-performance') {
-    chrome.storage.local.get('cpo_enabled', (data) => {
+    chrome.storage.sync.get('cpo_enabled', (data) => {
       const newState = !data.cpo_enabled;
-      chrome.storage.local.set({ cpo_enabled: newState });
+      chrome.storage.sync.set({ cpo_enabled: newState });
       updateBadge(newState);
     });
-  }
-
-  if (command === 'cycle-preset') {
-    chrome.storage.local.get('cpo_preset', (data) => {
+  } else if (command === 'toggle-floating-button') {
+    // Alt+Shift+P keyboard shortcut to toggle visibility of floating button
+    chrome.storage.sync.get('cpo_showFloatingBtn', (data) => {
+      const current = data.cpo_showFloatingBtn !== undefined ? data.cpo_showFloatingBtn : true;
+      chrome.storage.sync.set({ cpo_showFloatingBtn: !current });
+    });
+  } else if (command === 'cycle-preset') {
+    chrome.storage.sync.get('cpo_preset', (data) => {
       const current = data.cpo_preset || 'balanced';
       const idx = PRESET_ORDER.indexOf(current);
       const next = PRESET_ORDER[(idx + 1) % PRESET_ORDER.length];
@@ -119,40 +134,42 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-// ── Apply Preset ─────────────────────────────────────────────────
+// --- Apply Preset configuration to synced storage ---
 function applyPreset(key) {
   const preset = PRESETS[key];
   if (!preset) return;
 
-  chrome.storage.local.set({
+  chrome.storage.sync.set({
     cpo_preset: key,
     cpo_visibleCount: preset.visibleCount,
     cpo_threshold: preset.threshold,
-    cpo_killAnimations: preset.killAnimations,
-    cpo_lazyImages: preset.lazyImages,
-    cpo_optimizeCodeBlocks: preset.optimizeCodeBlocks,
-    cpo_cssContainment: preset.cssContainment,
-    cpo_autoDetect: preset.autoDetect,
-    cpo_enabled: true,
+    
+    // Set layer config matching preset values
+    cpo_layer_killAnimations: preset.killAnimations,
+    cpo_layer_lazyImages: preset.lazyImages,
+    cpo_layer_optimizeCodeBlocks: preset.optimizeCodeBlocks,
+    cpo_layer_cssContainment: preset.cssContainment,
+    cpo_layer_autoDetect: preset.autoDetect,
+    cpo_enabled: true, // Preset activation implicitly enables performance engine
   });
 
   updateBadge(true);
 }
 
-// ── Badge Update ─────────────────────────────────────────────────
+// --- Badge UI Manager ---
 function updateBadge(enabled) {
   chrome.action.setBadgeText({ text: enabled ? 'ON' : '' });
-  chrome.action.setBadgeBackgroundColor({ color: enabled ? '#10b981' : '#6b7280' });
+  chrome.action.setBadgeBackgroundColor({ color: enabled ? '#7C3AED' : '#6B7280' }); // Electric Purple badge on active
 }
 
-// ── Listen for state changes to update badge ─────────────────────
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.cpo_enabled) {
+// --- Sync state changes to Action Badge ---
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'sync' && changes.cpo_enabled) {
     updateBadge(changes.cpo_enabled.newValue);
   }
 });
 
-// ── Init badge on startup ────────────────────────────────────────
-chrome.storage.local.get('cpo_enabled', (data) => {
+// --- Load Badge state on startup ---
+chrome.storage.sync.get('cpo_enabled', (data) => {
   updateBadge(data.cpo_enabled || false);
 });

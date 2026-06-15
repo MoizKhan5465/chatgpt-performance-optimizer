@@ -1,303 +1,382 @@
 /**
- * ChatGPT Performance Optimizer v2.2 — Popup Script
- * Handles presets, custom message count, optimization layers, and live stats.
+ * CPO v3.0 — Popup Controller
  */
-
 (function () {
   'use strict';
 
-  /* ================================================================
-     PRESET DEFINITIONS (must match service_worker.js)
-     ================================================================ */
-  const PRESETS = {
-    mild:       { visibleCount: 25, threshold: 30, killAnimations: false, lazyImages: false, optimizeCodeBlocks: false, cssContainment: true, autoDetect: true },
-    balanced:   { visibleCount: 15, threshold: 20, killAnimations: true,  lazyImages: true,  optimizeCodeBlocks: false, cssContainment: true, autoDetect: true },
-    aggressive: { visibleCount: 8,  threshold: 12, killAnimations: true,  lazyImages: true,  optimizeCodeBlocks: true,  cssContainment: true, autoDetect: true },
-    extreme:    { visibleCount: 3,  threshold: 5,  killAnimations: true,  lazyImages: true,  optimizeCodeBlocks: true,  cssContainment: true, autoDetect: true },
+  /* -------------------------------------------------------------------------
+     Element refs — new clean UI
+     ------------------------------------------------------------------------- */
+  const mainToggle          = document.getElementById('mainToggle');
+  const themeToggle         = document.getElementById('themeToggle');
+  const thresholdSlider     = document.getElementById('thresholdSlider');
+  const thresholdDisplay    = document.getElementById('thresholdDisplay');
+  const visibleCountSlider  = document.getElementById('visibleCountSlider');
+  const visibleCountDisplay = document.getElementById('visibleCountDisplay');
+  const toggleFloatingBtn   = document.getElementById('toggleFloatingBtn');
+  const runNowBtn           = document.getElementById('runNowBtn');
+  const resetAllBtn         = document.getElementById('resetAllBtn');
+
+  // Status row
+  const statusPip   = document.getElementById('statusPip');
+  const statusText  = document.getElementById('statusText');
+
+  // Stats grid
+  const ringValue   = document.getElementById('ringValue');
+  const hiddenCount = document.getElementById('hiddenCount');
+  const visibleCount= document.getElementById('visibleCount');
+  const savingPct   = document.getElementById('savingPct');
+
+  // Load bar
+  const progressFill      = document.getElementById('progressFill');
+  const progressThreshold = document.getElementById('progressThreshold');
+  const progressInfo      = document.getElementById('progressInfo');
+  const thresholdLabel    = document.getElementById('thresholdLabel');
+
+  // Compat hidden spans (keep for popup.js API)
+  const statHidden    = document.getElementById('statHidden');
+  const statTotal     = document.getElementById('statTotal');
+  const scoreValue    = document.getElementById('scoreValue');
+  const scoreSubtitle = document.getElementById('scoreSubtitle');
+  const canvas        = document.getElementById('sparkline');
+  const ctx           = canvas ? canvas.getContext('2d') : null;
+  const timelineNodes = document.getElementById('timelineNodes');
+
+  /* -------------------------------------------------------------------------
+     Config
+     ------------------------------------------------------------------------- */
+  const LAYER_KEYS = ['messageCollapsing', 'cssContainment', 'killAnimations', 'autoDetect'];
+
+  const DEFAULT_PREFS = {
+    cpo_enabled: false,
+    cpo_theme: 'dark',
+    cpo_threshold: 20,
+    cpo_visibleCount: 15,
+    cpo_showFloatingBtn: true,
+    cpo_layer_messageCollapsing: true,
+    cpo_layer_cssContainment: true,
+    cpo_layer_killAnimations: true,
+    cpo_layer_autoDetect: true,
   };
 
-  /* ================================================================
-     DOM REFS
-     ================================================================ */
-  const mainToggle       = document.getElementById('mainToggle');
-  const statusCard       = document.getElementById('statusCard');
-  const statusLabel      = document.getElementById('statusLabel');
-  const statusSublabel   = document.getElementById('statusSublabel');
+  /* -------------------------------------------------------------------------
+     Helpers
+     ------------------------------------------------------------------------- */
+  function safe(fn) { try { fn(); } catch (_) {} }
 
-  // Message count
-  const visibleCountInput  = document.getElementById('visibleCount');
-  const visibleSlider      = document.getElementById('visibleSlider');
-  const thresholdSlider    = document.getElementById('threshold');
-  const thresholdDisplay   = document.getElementById('thresholdDisplay');
+  function setNum(el, val) {
+    if (!el) return;
+    const next = typeof val === 'number' ? val : (parseInt(val, 10) || 0);
+    if (el.textContent === String(next)) return;
+    el.textContent = next;
+    el.classList.remove('num-changed');
+    void el.offsetWidth;
+    el.classList.add('num-changed');
+  }
 
-  // Optimization checkboxes
-  const autoDetect         = document.getElementById('autoDetect');
-  const killAnimations     = document.getElementById('killAnimations');
-  const cssContainment     = document.getElementById('cssContainment');
-  const optimizeCodeBlocks = document.getElementById('optimizeCodeBlocks');
-  const lazyImages         = document.getElementById('lazyImages');
-  const showFloatingBtn    = document.getElementById('showFloatingBtn');
+  /* -------------------------------------------------------------------------
+     Status pip + text
+     ------------------------------------------------------------------------- */
+  function setStatus(enabled, streaming) {
+    if (!statusPip || !statusText) return;
+    if (streaming) {
+      statusPip.className  = 'status-pip streaming';
+      statusText.className = 'status-text streaming';
+      statusText.textContent = 'Streaming';
+    } else if (enabled) {
+      statusPip.className  = 'status-pip active';
+      statusText.className = 'status-text active';
+      statusText.textContent = 'Active';
+    } else {
+      statusPip.className  = 'status-pip';
+      statusText.className = 'status-text';
+      statusText.textContent = 'Inactive';
+    }
+  }
 
-  // Stats
-  const statHidden         = document.getElementById('statHidden');
-  const statVisible        = document.getElementById('statVisible');
-  const statTotal          = document.getElementById('statTotal');
-  const statSent           = document.getElementById('statSent');
-  const statNodesRemoved   = document.getElementById('statNodesRemoved');
-  const statCodeBlocks     = document.getElementById('statCodeBlocks');
-  const statImagesDeferred = document.getElementById('statImagesDeferred');
-  const reductionPct       = document.getElementById('reductionPct');
-  const reductionFill      = document.getElementById('reductionFill');
-  const nodesBefore        = document.getElementById('nodesBefore');
-  const nodesAfter         = document.getElementById('nodesAfter');
-  const nodesSaved         = document.getElementById('nodesSaved');
+  /* -------------------------------------------------------------------------
+     Load bar
+     ------------------------------------------------------------------------- */
+  function setLoadBar(total, threshold) {
+    const maxVal = Math.max(threshold * 2, total + 4, 10);
+    const pct    = Math.min((total / maxVal) * 100, 100);
+    const tPct   = Math.min((threshold / maxVal) * 100, 96);
 
-  // Preset buttons
-  const presetGrid         = document.getElementById('presetGrid');
-  const presetBtns         = presetGrid.querySelectorAll('.preset-btn');
-  const presetState        = document.getElementById('presetState');
+    if (progressFill)   progressFill.style.width = pct + '%';
+    if (progressInfo)   progressInfo.textContent = `${total} message${total !== 1 ? 's' : ''} in chat`;
+    if (thresholdLabel) thresholdLabel.textContent = `trigger at ${threshold}`;
 
-  // Quick count buttons
-  const quickBtns          = document.querySelectorAll('.quick-btn');
+    // Position threshold marker — it lives outside overflow:hidden
+    if (progressThreshold) {
+      progressThreshold.style.left = tPct + '%';
+    }
+  }
 
-  /* ================================================================
-     LOAD SETTINGS
-     ================================================================ */
-  function loadSettings() {
-    chrome.storage.local.get(null, (data) => {
-      // Main toggle
-      mainToggle.checked = data.cpo_enabled || false;
-      updateStatusUI(mainToggle.checked);
+  /* -------------------------------------------------------------------------
+     Layer rows — dot + checkbox + count badge
+     ------------------------------------------------------------------------- */
+  function setLayers(prefs, stats, enabled) {
+    const hidden = (stats && stats.hidden) || 0;
 
-      // Message count
-      const count = data.cpo_visibleCount || 15;
-      visibleCountInput.value = count;
-      visibleSlider.value = count;
-      highlightQuickBtn(count);
+    LAYER_KEYS.forEach(key => {
+      const on    = !!(prefs[`cpo_layer_${key}`]);
+      const cb    = document.getElementById(`layer-${key}`);
+      const dot   = document.getElementById(`dot-${key}`);
+      const badge = document.getElementById(`badge-${key}`);
+      const row   = document.getElementById(`lc-${key}`);
 
-      // Threshold
-      const thresh = data.cpo_threshold || 20;
-      thresholdSlider.value = thresh;
-      thresholdDisplay.textContent = thresh;
+      if (cb)  cb.checked = on;
+      if (dot) dot.className = (enabled && on) ? 'layer-dot on' : 'layer-dot';
 
-      // Optimizations
-      autoDetect.checked         = data.cpo_autoDetect !== undefined ? data.cpo_autoDetect : true;
-      killAnimations.checked     = data.cpo_killAnimations !== undefined ? data.cpo_killAnimations : true;
-      cssContainment.checked     = data.cpo_cssContainment !== undefined ? data.cpo_cssContainment : true;
-      optimizeCodeBlocks.checked = data.cpo_optimizeCodeBlocks !== undefined ? data.cpo_optimizeCodeBlocks : true;
-      lazyImages.checked         = data.cpo_lazyImages !== undefined ? data.cpo_lazyImages : true;
-      showFloatingBtn.checked    = data.cpo_showFloatingBtn !== undefined ? data.cpo_showFloatingBtn : true;
-
-      // Update card states
-      updateOptCards();
-
-      // Active preset
-      highlightPreset(data.cpo_preset || 'balanced');
-
-      // Stats
-      updateStats(data.cpo_stats);
+      if (badge) {
+        if (key === 'messageCollapsing' && enabled && on && hidden > 0) {
+          badge.textContent = hidden;
+        } else {
+          badge.textContent = '';
+        }
+      }
     });
   }
 
-  /* ================================================================
-     UI UPDATERS
-     ================================================================ */
-  function updateStatusUI(enabled) {
-    statusCard.classList.toggle('active', enabled);
-    statusLabel.textContent = enabled ? 'Active' : 'Disabled';
+  /* -------------------------------------------------------------------------
+     Full dashboard refresh
+     ------------------------------------------------------------------------- */
+  function refresh(prefs, stats) {
+    const enabled   = !!prefs.cpo_enabled;
+    const total     = (stats && stats.total)  || 0;
+    const hidden    = (stats && stats.hidden) || 0;
+    const rendering = Math.max(0, total - hidden);
+    const threshold = prefs.cpo_threshold || 20;
+    const streaming = !!(stats && stats.isStreaming);
+    const pct       = total > 0 ? Math.round((hidden / total) * 100) : 0;
 
-    // Count enabled layers
-    const layers = [autoDetect, killAnimations, cssContainment, optimizeCodeBlocks, lazyImages].filter(c => c.checked).length;
-    statusSublabel.textContent = enabled
-      ? `${layers + 3} optimization layers running`  // +3 for L1 DOM detach, L6 throttle, L7 idle, L8 memory
-      : 'Toggle to boost performance';
+    // Status
+    setStatus(enabled, streaming);
+
+    // Sync main toggle
+    if (mainToggle) mainToggle.checked = enabled;
+
+    // Sliders display
+    if (visibleCountDisplay) visibleCountDisplay.textContent = prefs.cpo_visibleCount || 15;
+    if (thresholdDisplay)    thresholdDisplay.textContent    = threshold;
+    if (visibleCountSlider)  visibleCountSlider.value        = prefs.cpo_visibleCount || 15;
+    if (thresholdSlider)     thresholdSlider.value           = threshold;
+    if (toggleFloatingBtn)   toggleFloatingBtn.checked       = !!prefs.cpo_showFloatingBtn;
+
+    // Stats grid
+    setNum(ringValue,    total);
+    setNum(hiddenCount,  hidden);
+    setNum(visibleCount, rendering);
+    if (savingPct) savingPct.textContent = enabled && total > 0 ? pct + '%' : '—';
+
+    // Load bar
+    setLoadBar(total, threshold);
+
+    // Layer rows
+    setLayers(prefs, stats, enabled);
+
+    // Compat
+    if (statTotal)     statTotal.textContent     = total;
+    if (statHidden)    statHidden.textContent     = hidden;
+    if (scoreValue)    scoreValue.textContent     = pct + '%';
+    if (scoreSubtitle) scoreSubtitle.textContent  = `${hidden} of ${total} hidden`;
   }
 
-  function updateStats(stats) {
-    if (!stats) return;
-
-    statHidden.textContent         = stats.hidden || 0;
-    statVisible.textContent        = stats.visible || 0;
-    statTotal.textContent          = stats.total || 0;
-    statSent.textContent           = stats.sent || 0;
-    statNodesRemoved.textContent   = stats.domNodesRemoved || 0;
-    statCodeBlocks.textContent     = stats.codeBlocksOptimized || 0;
-    statImagesDeferred.textContent = stats.imagesDeferred || 0;
-
-    // DOM reduction bar
-    const before = stats.domNodesBefore || 0;
-    const after  = stats.domNodesAfter || before;
-    const saved  = Math.max(0, before - after);
-    const pct    = before > 0 ? Math.round((saved / before) * 100) : 0;
-    const clamped = Math.max(0, Math.min(pct, 100));
-
-    reductionPct.textContent  = clamped + '%';
-    reductionFill.style.width = clamped + '%';
-
-    nodesBefore.textContent = 'Before: ' + (before > 0 ? before.toLocaleString() : '—');
-    nodesAfter.textContent  = 'After: ' + (after > 0 ? after.toLocaleString() : '—');
-    nodesSaved.textContent  = 'Saved: ' + (saved > 0 ? saved.toLocaleString() : '—');
-  }
-
-  function highlightPreset(key) {
-    presetBtns.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.preset === key);
-    });
-    const label = key === 'custom' ? 'Custom' : (key ? key.charAt(0).toUpperCase() + key.slice(1) : 'Balanced');
-    presetState.textContent = `Current preset: ${label}`;
-  }
-
-  function highlightQuickBtn(count) {
-    quickBtns.forEach(btn => {
-      btn.classList.toggle('active', parseInt(btn.dataset.count) === count);
-    });
-  }
-
-  function updateOptCards() {
-    document.querySelectorAll('.opt-card').forEach(card => {
-      const checkbox = card.querySelector('input[type="checkbox"]');
-      card.classList.toggle('enabled', checkbox.checked);
-    });
-  }
-
-  function setVisibleCount(count) {
-    count = Math.max(1, Math.min(100, parseInt(count) || 15));
-    visibleCountInput.value = count;
-    visibleSlider.value = count;
-    highlightQuickBtn(count);
-    chrome.storage.local.set({ cpo_visibleCount: count, cpo_preset: 'custom' });
-    highlightPreset('custom'); // deselect preset
-  }
-
-  /* ================================================================
-     EVENT LISTENERS
-     ================================================================ */
-
-  // ── Main Toggle ──
-  mainToggle.addEventListener('change', () => {
-    chrome.storage.local.set({ cpo_enabled: mainToggle.checked });
-    updateStatusUI(mainToggle.checked);
-  });
-
-  // ── Presets ──
-  presetBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const key = btn.dataset.preset;
-      const preset = PRESETS[key];
-      if (!preset) return;
-
-      highlightPreset(key);
-
-      // Apply preset values to UI
-      visibleCountInput.value = preset.visibleCount;
-      visibleSlider.value = preset.visibleCount;
-      highlightQuickBtn(preset.visibleCount);
-      thresholdSlider.value = preset.threshold;
-      thresholdDisplay.textContent = preset.threshold;
-      autoDetect.checked         = preset.autoDetect;
-      killAnimations.checked     = preset.killAnimations;
-      cssContainment.checked     = preset.cssContainment;
-      optimizeCodeBlocks.checked = preset.optimizeCodeBlocks;
-      lazyImages.checked         = preset.lazyImages;
-      updateOptCards();
-
-      // Save to storage (content script will react)
-      chrome.storage.local.set({
-        cpo_preset: key,
-        cpo_visibleCount: preset.visibleCount,
-        cpo_threshold: preset.threshold,
-        cpo_autoDetect: preset.autoDetect,
-        cpo_killAnimations: preset.killAnimations,
-        cpo_cssContainment: preset.cssContainment,
-        cpo_optimizeCodeBlocks: preset.optimizeCodeBlocks,
-        cpo_lazyImages: preset.lazyImages,
-        cpo_enabled: true,
+  /* -------------------------------------------------------------------------
+     Load state from storage
+     ------------------------------------------------------------------------- */
+  function loadState() {
+    safe(() => {
+      chrome.storage.sync.get(DEFAULT_PREFS, prefs => {
+        applyTheme(prefs.cpo_theme || 'dark');
+        safe(() => {
+          chrome.storage.local.get({ cpo_stats: null, cpo_history: [] }, local => {
+            refresh(prefs, local.cpo_stats);
+            drawTimeline(local.cpo_history || []);
+            if (timelineNodes && local.cpo_history && local.cpo_history.length) {
+              timelineNodes.textContent = local.cpo_history[local.cpo_history.length - 1];
+            }
+          });
+        });
       });
-      mainToggle.checked = true;
-      updateStatusUI(true);
     });
-  });
+  }
 
-  // ── Custom message count (number input) ──
-  visibleCountInput.addEventListener('input', () => {
-    setVisibleCount(visibleCountInput.value);
-  });
+  /* -------------------------------------------------------------------------
+     Theme
+     ------------------------------------------------------------------------- */
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (!themeToggle) return;
+    themeToggle.innerHTML = theme === 'light'
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+  }
 
-  // ── Slider sync ──
-  visibleSlider.addEventListener('input', () => {
-    setVisibleCount(visibleSlider.value);
-  });
-
-  // ── Quick count buttons ──
-  quickBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      setVisibleCount(btn.dataset.count);
+  /* -------------------------------------------------------------------------
+     Sparkline (compat)
+     ------------------------------------------------------------------------- */
+  function drawTimeline(history) {
+    if (!ctx || !canvas || !history || history.length < 2) return;
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const max = Math.max(...history), min = Math.min(...history);
+    const range = max - min || 1;
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    history.forEach((v, i) => {
+      const x = (i / (history.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
-  });
+    ctx.stroke();
+  }
 
-  // ── Threshold ──
-  thresholdSlider.addEventListener('input', () => {
-    thresholdDisplay.textContent = thresholdSlider.value;
-    chrome.storage.local.set({
-      cpo_threshold: parseInt(thresholdSlider.value, 10),
-      cpo_preset: 'custom',
+  /* DOM reduction compat */
+  function updateDOMReductionDisplay(pct, savedNodes, hiddenMsgs, totalMsgs) {
+    if (scoreValue)    scoreValue.textContent    = pct + '%';
+    if (scoreSubtitle) scoreSubtitle.textContent = `${hiddenMsgs} of ${totalMsgs || 0} hidden`;
+  }
+
+  /* -------------------------------------------------------------------------
+     Send message to active tab
+     ------------------------------------------------------------------------- */
+  function sendToTab(msg) {
+    safe(() => {
+      chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id, msg, () => { const _ = chrome.runtime.lastError; });
+        }
+      });
     });
-    highlightPreset('custom');
-  });
+  }
 
-  // ── Optimization toggles ──
-  const optMap = [
-    [autoDetect,         'cpo_autoDetect'],
-    [killAnimations,     'cpo_killAnimations'],
-    [cssContainment,     'cpo_cssContainment'],
-    [optimizeCodeBlocks, 'cpo_optimizeCodeBlocks'],
-    [lazyImages,         'cpo_lazyImages'],
-    [showFloatingBtn,    'cpo_showFloatingBtn'],
-  ];
-
-  optMap.forEach(([el, key]) => {
-    el.addEventListener('change', () => {
-      chrome.storage.local.set({ [key]: el.checked, cpo_preset: 'custom' });
-      updateOptCards();
-      updateStatusUI(mainToggle.checked);
-      highlightPreset('custom');
+  /* -------------------------------------------------------------------------
+     Event listeners
+     ------------------------------------------------------------------------- */
+  if (mainToggle) {
+    mainToggle.addEventListener('change', () => {
+      safe(() => chrome.storage.sync.set({ cpo_enabled: mainToggle.checked }));
     });
-  });
+  }
 
-  // ── Clicking opt-card also toggles checkbox ──
-  document.querySelectorAll('.opt-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      if (e.target.type === 'checkbox') return;  // let checkbox handle itself
-      const checkbox = card.querySelector('input[type="checkbox"]');
-      checkbox.checked = !checkbox.checked;
-      checkbox.dispatchEvent(new Event('change'));
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      const cur  = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = cur === 'dark' ? 'light' : 'dark';
+      safe(() => chrome.storage.sync.set({ cpo_theme: next }));
+      applyTheme(next);
     });
-  });
+  }
 
-  /* ================================================================
-     LIVE UPDATES FROM CONTENT SCRIPT
-     ================================================================ */
-  chrome.storage.onChanged.addListener((changes) => {
-    if (changes.cpo_stats) {
-      updateStats(changes.cpo_stats.newValue);
+  if (thresholdSlider) {
+    thresholdSlider.addEventListener('input', () => {
+      if (thresholdDisplay) thresholdDisplay.textContent = thresholdSlider.value;
+    });
+    thresholdSlider.addEventListener('change', () => {
+      safe(() => chrome.storage.sync.set({ cpo_threshold: +thresholdSlider.value }));
+    });
+  }
+
+  if (visibleCountSlider) {
+    visibleCountSlider.addEventListener('input', () => {
+      if (visibleCountDisplay) visibleCountDisplay.textContent = visibleCountSlider.value;
+    });
+    visibleCountSlider.addEventListener('change', () => {
+      safe(() => chrome.storage.sync.set({ cpo_visibleCount: +visibleCountSlider.value }));
+    });
+  }
+
+  if (toggleFloatingBtn) {
+    toggleFloatingBtn.addEventListener('change', () => {
+      safe(() => chrome.storage.sync.set({ cpo_showFloatingBtn: toggleFloatingBtn.checked }));
+    });
+  }
+
+  // Layer rows — click on row toggles, or toggle the checkbox directly
+  LAYER_KEYS.forEach(key => {
+    const cb  = document.getElementById(`layer-${key}`);
+    const row = document.getElementById(`lc-${key}`);
+    if (cb) {
+      row?.addEventListener('click', e => {
+        if (e.target === cb || e.target.closest('.toggle-pill')) return;
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      });
+      cb.addEventListener('change', () => {
+        safe(() => chrome.storage.sync.set({ [`cpo_layer_${key}`]: cb.checked }));
+      });
     }
-    if (changes.cpo_enabled) {
-      mainToggle.checked = changes.cpo_enabled.newValue;
-      updateStatusUI(changes.cpo_enabled.newValue);
-    }
-    if (changes.cpo_preset) {
-      highlightPreset(changes.cpo_preset.newValue);
-    }
-    if (changes.cpo_visibleCount) {
-      const v = changes.cpo_visibleCount.newValue;
-      visibleCountInput.value = v;
-      visibleSlider.value = v;
-      highlightQuickBtn(v);
-    }
   });
 
-  /* ================================================================
-     INIT
-     ================================================================ */
-  loadSettings();
+  if (runNowBtn) {
+    runNowBtn.addEventListener('click', () => {
+      sendToTab({ action: 'force-optimize' });
+      safe(() => chrome.storage.sync.set({ cpo_enabled: true }));
+      if (mainToggle) mainToggle.checked = true;
+    });
+  }
+
+  if (resetAllBtn) {
+    resetAllBtn.addEventListener('click', () => {
+      safe(() => {
+        chrome.storage.sync.set(DEFAULT_PREFS, () => {
+          chrome.storage.local.set({ cpo_stats: null, cpo_history: [] }, () => {
+            sendToTab({ action: 'reset-all' });
+            loadState();
+          });
+        });
+      });
+    });
+  }
+
+  /* -------------------------------------------------------------------------
+     Storage change listener — live refresh
+     ------------------------------------------------------------------------- */
+  safe(() => {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'sync' || area === 'local') loadState();
+    });
+  });
+
+  /* -------------------------------------------------------------------------
+     Runtime message listener — live push from content script
+     ------------------------------------------------------------------------- */
+  safe(() => {
+    chrome.runtime.onMessage.addListener(message => {
+      if (message.action === 'live-stats-update') {
+        const hidden    = message.hiddenMessages || 0;
+        const total     = message.totalMessages  || 0;
+        const streaming = !!message.isStreaming;
+        const enabled   = !!message.enabled;
+        const pct       = total > 0 ? Math.round((hidden / total) * 100) : 0;
+
+        setStatus(enabled, streaming);
+        setNum(ringValue,    total);
+        setNum(hiddenCount,  hidden);
+        setNum(visibleCount, Math.max(0, total - hidden));
+        if (savingPct) savingPct.textContent = enabled && total > 0 ? pct + '%' : '—';
+
+        const threshold = thresholdSlider ? +thresholdSlider.value : 20;
+        setLoadBar(total, threshold);
+
+        if (statTotal)  statTotal.textContent  = total;
+        if (statHidden) statHidden.textContent = hidden;
+
+      } else if (message.type === 'STATS_RESET' || message.action === 'STATS_RESET') {
+        safe(() => {
+          chrome.storage.local.set({ cpo_stats: null, cpo_history: [] }, () => loadState());
+        });
+      }
+    });
+  });
+
+  /* -------------------------------------------------------------------------
+     Boot
+     ------------------------------------------------------------------------- */
+  loadState();
+  setInterval(loadState, 3000);
+
 })();
